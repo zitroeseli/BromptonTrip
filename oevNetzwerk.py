@@ -5,6 +5,7 @@ import sys
 from operator import itemgetter
 import time
 import csv
+from collections import Counter
 
 nodeDict = {}
 nodeD = {}
@@ -46,6 +47,7 @@ def buildListFromCSV(csvFile):
             stationList.append([i,tripID,stopID,time,float(xcoord),float(ycoord)])
             i+=1
     return stationList
+
     
 def exportCSV(filename,csvList,numberCharacter):
     with open(filename, 'w', encoding='utf-8') as csvfile:
@@ -72,6 +74,40 @@ def exportCSV(filename,csvList,numberCharacter):
             for row in csvList:
                 csvwriter.writerow([str(row[0])]+[str(row[1])]+[str(row[2])]+[str(row[3])]+[str(row[4])]+[str(row[5])]+[str(row[6])]+[str(row[7])])
 
+def rebuildLineList(stationList,networkList):
+    onlyStop = []
+    lastStopID = ''
+    lastTripID = ''
+    lastTime = ''
+    multiStopID = []
+    multiStopIDall = []
+    i=0
+    fromNode = ''
+    toNode = ''
+    # Liste anlegen, die nur Stops enthaelt
+    for stop in stationList:
+        onlyStop.append(stop[2]) 
+    stopOccurance = Counter(onlyStop)
+    # Anzahl Vorkommen der Stops zaehlen
+    for stop in stopOccurance:
+        stopCount = stopOccurance[stop]
+        if stopCount > 1:
+            multiStopID.append(stop)
+    sorted(stationList, key=itemgetter(1,3))
+    for row in stationList:
+        if row[2] in multiStopID:
+            multiStopIDall.append(row)
+    for dubbleStation1 in multiStopIDall:
+        for dubbleStation2 in multiStopIDall:
+            if dubbleStation1[2] == dubbleStation2[2] and dubbleStation1[3] < dubbleStation2[3]:
+                fromNode = dubbleStation1[1]+"-"+dubbleStation1[2]
+                toNode = dubbleStation2[1]+"-"+dubbleStation2[2]
+                timeDepart = time.mktime(time.strptime(dubbleStation1[3], "%H:%M:%S"))
+                timeArrival = time.mktime(time.strptime(dubbleStation2[3], "%H:%M:%S"))
+                cost = timeArrival - timeDepart
+                networkList.append([i, fromNode, toNode, cost])
+        i+=1
+    return networkList
  
 def buildNetworkEdge(stationList): # Verbindung auch zwischen den Linien
     sorted(stationList, key=itemgetter(1,3))
@@ -90,6 +126,8 @@ def buildNetworkEdge(stationList): # Verbindung auch zwischen den Linien
         lastStopID = row[1]+"-"+row[2]
         lastTripID = row[1]
         lastTime = row[3]
+    crossLineEdges = rebuildLineList(stationList,networkList)
+    networkList.append(crossLineEdges)
     return networkList
     
 def buildNetworkNode(stationList):
@@ -187,16 +225,18 @@ def nextStep2(eList):
         lastNode = (sortedTempList[0][2])
     return(lastNode)
 
-stopList = buildListFromCSV('tempStopTrip_small.csv')
+stopList = buildListFromCSV('../Fahrplan2018GTFS/tempStopTrip_small.csv')
 networkListEdge = buildNetworkEdge(stopList)
 networkListNode = buildNetworkNode(stopList)
-exportCSV('tempNetwork.csv',networkListEdge,4)
+exportCSV('../Fahrplan2018GTFS/tempNetwork.csv',networkListEdge,4)
 newList=[]
 #for e in networkListNode:
 #    newList.append([e,networkListNode[e]])
 
-startNode = '1.TA.1-1-B-j18-1.1.H-8500010P' #'1.TA.1-1-A-j18-1.1.H-8503000P'
-endNode = '1.TA.1-1-A-j18-1.1.H-8502114P' #'1.TA.1-1-A-j18-1.1.H-8500309P'
+#startNode = '1.TA.1-1-A-j18-1.1.H-8503000P' # Zuerich HB
+#endNode = '1.TA.1-1-A-j18-1.1.H-8500309P' # Brugg AG
+startNode = '1.TA.1-1-B-j18-1.1.H-8500010P' #'1.TA.1-1-A-j18-1.1.H-8503000P' # Basel SBB
+endNode = '1.TA.1-1-A-j18-1.1.H-8502114P' #'1.TA.1-1-A-j18-1.1.H-8500309P' # Rupperswil
 '''
 Da es mehrere gleiche Nodes bei den Umsteigepunkten gibt, braucht es auch mehrere Edges
 Ort der Umsteigepunkte kann mit einer List seen überprüft werden, da braucht es neuen edge
